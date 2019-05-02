@@ -3,7 +3,7 @@
 
 # # Imports
 
-# In[1]:
+# In[23]:
 
 
 from PIL import Image
@@ -15,13 +15,30 @@ from scipy.sparse import csr_matrix, hstack
 import matplotlib.pyplot as plt
 import seaborn as seab
 import warnings
+
+# import tensorflow as tf
+import seaborn as sns
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA, TruncatedSVD
+import matplotlib.patches as mpatches
+
+# from imblearn.datasets import fetch_datasets
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from imblearn.pipeline import make_pipeline as imbalanced_make_pipeline
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import NearMiss
+from imblearn.metrics import classification_report_imbalanced
+from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, accuracy_score, classification_report
+from collections import Counter
+
 warnings.filterwarnings("ignore")
 import pandas as pd
 from sklearn import metrics
 np.set_printoptions(suppress=True) 
 
 
-# In[149]:
+# In[2]:
 
 
 def heatmap(confusionmat,title="Confusion Matrix",title2="",index=0):
@@ -40,26 +57,26 @@ def getConfusionMat(predicted, actual,classcount):
     return confusionmatrix
 
 
-# In[2]:
+# In[3]:
 
 
 all_data = pd.read_csv("../Dataset/PS_20174392719_1491204439457_log.csv")
 
 
-# In[3]:
+# In[4]:
 
 
 print len(all_data)
 
 
-# In[4]:
+# In[5]:
 
 
 print all_data.keys()
 all_data.shape
 
 
-# In[99]:
+# In[6]:
 
 
 print all_data.iloc[0,:]
@@ -68,14 +85,14 @@ all_data.head()
 
 # # remove feature isFlagged fraud
 
-# In[6]:
+# In[7]:
 
 
 new_all_data = pd.DataFrame()
 new_all_data = new_all_data.append(all_data.loc[:,['step','type','amount','nameOrig','oldbalanceOrg','newbalanceOrig','nameDest','oldbalanceDest','newbalanceDest','isFraud']])
 
 
-# In[7]:
+# In[8]:
 
 
 print len(new_all_data)
@@ -87,19 +104,73 @@ print len(new_all_data)
 
 
 
-# In[8]:
+# # Data Visualisations
+
+# In[9]:
 
 
-set(new_all_data.type)
+print(new_all_data.type.value_counts())
+
+f, ax = plt.subplots(1, 1, figsize=(8, 8))
+new_all_data.type.value_counts().plot(kind='bar', title="Transaction type", ax=ax, figsize=(8,8))
+plt.show()
+
+
+# In[10]:
+
+
+ax = new_all_data.groupby(['type', 'isFraud']).size().plot(kind='bar')
+ax.set_title("# of transaction which are the actual fraud per transaction type")
+ax.set_xlabel("(Type, isFraud)")
+ax.set_ylabel("Count of transaction")
+for p in ax.patches:
+    ax.annotate(str(format(int(p.get_height()), ',d')), (p.get_x(), p.get_height()*1.01))
+
+
+# In[11]:
+
+
+ax = all_data.groupby(['type', 'isFlaggedFraud']).size().plot(kind='bar')
+ax.set_title("# of transaction which is flagged as fraud per transaction type")
+ax.set_xlabel("(Type, isFlaggedFraud)")
+ax.set_ylabel("Count of transaction")
+for p in ax.patches:
+    ax.annotate(str(format(int(p.get_height()), ',d')), (p.get_x(), p.get_height()*1.01))
+
+
+# In[17]:
+
+
+tmp = all_data.loc[(all_data['type'].isin(['TRANSFER', 'CASH_OUT'])),:]
+ax = pd.value_counts(tmp['isFraud'], sort = True).sort_index().plot(kind='bar',color = "green", title="Fraud transaction count")
+for p in ax.patches:
+    ax.annotate(str(format(int(p.get_height()), ',d')), (p.get_x(), p.get_height()))
+    
+plt.show()
+
+
+# # Data Visualisation End
+
+# In[24]:
+
+
+
 
 
 # In[9]:
 
 
+set(new_all_data.type)
+
+
+# In[27]:
+
+
+# pop = fsga.generate(100)
 new_filterdata = pd.DataFrame()
 
 
-# In[10]:
+# In[28]:
 
 
 new_filterdata = pd.DataFrame()
@@ -110,63 +181,75 @@ len(new_filterdata)
 print new_filterdata.keys()
 
 
-# In[11]:
+# In[29]:
 
 
 print set(new_filterdata.type)
 
 
-# In[12]:
+# In[30]:
 
 
 new_filterdata.head()
 
 
-# In[13]:
+# In[37]:
 
 
 copydata = copy.deepcopy(new_filterdata)
 
 
-# In[14]:
+# In[38]:
 
 
 copydata.tail()
 
 
-# In[15]:
+# In[39]:
 
 
 copydata.head()
 
 
-# In[16]:
+# In[40]:
 
 
 # copydata.reset_index()
 
 
-# In[17]:
+# In[41]:
 
 
-copydata.loc[copydata.type == 'TRANSFER', 'type'] = 1
-copydata.loc[copydata.type == 'CASH_OUT', 'type'] = 2
+copydata.loc[copydata.type == 'TRANSFER', 'type'] = 0
+copydata.loc[copydata.type == 'CASH_OUT', 'type'] = 1
 
 
-# In[18]:
+# In[42]:
 
 
 copydata.tail()
 
 
-# In[19]:
+# In[43]:
 
 
 print len(set(copydata.nameOrig))
 print len(set(copydata.nameDest))
 
 
-# In[20]:
+# In[47]:
+
+
+from sklearn.preprocessing import OneHotEncoder
+enc = OneHotEncoder(handle_unknown='ignore')
+X = [['Male', 1], ['Female', 3], ['Female', 2]]
+enc.fit(X)
+print  enc.categories_
+print X
+enc.transform(X).toarray()
+
+
+# In[22]:
 
 
 copydata.head()
@@ -178,14 +261,14 @@ copydata.head()
 
 
 
-# In[21]:
+# In[23]:
 
 
 # copy2 = copy.deepcopy(copydata)
 # copy2.to_csv("../Dataset/filtereddata_withtypeconverted",index=False)
 
 
-# In[22]:
+# In[24]:
 
 
 # copydata = copy.deepcopy(copy2)
@@ -199,14 +282,14 @@ unique_nameDest = set(copydata.nameDest)
 
 
 
-# In[23]:
+# In[25]:
 
 
 print len(set(copydata.nameOrig))
 print len(set(copydata.nameDest))
 
 
-# In[24]:
+# In[29]:
 
 
 print len(copydata.nameDest)
@@ -218,19 +301,19 @@ print len(copydata.nameDest)
 
 
 
-# In[25]:
+# In[30]:
 
 
 listdata = np.array(copydata)
 
 
-# In[26]:
+# In[31]:
 
 
 print listdata[0]
 
 
-# In[27]:
+# In[32]:
 
 
 tmpunique = unique_nameDest.union(unique_nameOrig)
@@ -251,7 +334,7 @@ for i in range(len(listdata)):
         index += 1
 
 
-# In[28]:
+# In[33]:
 
 
 print listdata[0]
@@ -263,49 +346,49 @@ print listdata[0]
 
 
 
-# In[29]:
+# In[26]:
 
 
 newdataframe = pd.DataFrame(listdata,columns=copydata.keys())
 
 
-# In[30]:
+# In[35]:
 
 
 # newdataframe
 
 
-# In[54]:
+# In[36]:
 
 
 # newdataframe.to_csv("../Dataset/completepreprocesseddata.csv",index=False)
 
 
-# In[141]:
+# In[37]:
 
 
 train_data = newdataframe.loc[:,['step','type','amount','nameOrig','oldbalanceOrg','newbalanceOrig','nameDest','oldbalanceDest','newbalanceDest']]
 
 
-# In[142]:
+# In[38]:
 
 
 train_data.head()
 
 
-# In[143]:
+# In[40]:
 
 
 train_labels = newdataframe.loc[:,['isFraud']]
 
 
-# In[144]:
+# In[41]:
 
 
 train_labels.head()
 
 
-# In[145]:
+# In[42]:
 
 
 # train_data.to_csv("../Dataset/train_data.csv",index=False)
@@ -318,7 +401,7 @@ train_labels.head()
 
 
 
-# In[146]:
+# In[43]:
 
 
 from sklearn.svm import SVC
@@ -326,7 +409,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import accuracy_score
 
 
-# In[147]:
+# In[44]:
 
 
 # clf = SVC(gamma='auto')
@@ -334,12 +417,12 @@ clf = GaussianNB()
 clf.fit(np.array(train_data),np.array(train_labels).astype(int))
 
 
-# In[156]:
+# In[48]:
 
 
-y = clf.predict(np.array(train_data))
-print "Accuracy on Train Data: " +str( accuracy_score(y,np.array(train_labels).astype(int)))
-heatmap(getConfusionMat(predicted=y,actual=np.array(train_labels.isFraud).astype(int),classcount=2),title2=" with GaussianNB")
+# y = clf.predict(np.array(train_data))
+# print "Accuracy on Train Data: " +str( accuracy_score(y,np.array(train_labels).astype(int)))
+# heatmap(getConfusionMat(predicted=y,actual=np.array(train_labels.isFraud).astype(int),classcount=2),title2=" with GaussianNB")
 
 
 # In[65]:
@@ -374,13 +457,53 @@ print ('\n Fraudulent TRANSFER count = '+str(len(dfFraudTransfer))) # 4097
 print ('\n Fraudulent CASH_OUT count= '+str(len(dfFraudCashout))) 
 
 
-# In[97]:
+# In[48]:
 
 
 corr = train_data.astype(float).corr()
 ax = plt.axes()
 ax.set_title("Features Correlation")
-seab.heatmap(corr,linewidths=0.4,linecolor='white',annot=False,cmap ="YlGnBu",)
+seab.heatmap(corr,linewidths=0.4,linecolor='white',annot=True,cmap ="YlGnBu")
+
+
+# In[25]:
+
+
+train_data_correlation = newdataframe.loc[:,['step','type','amount','oldbalanceOrg','newbalanceOrig','oldbalanceDest']]
+
+
+# In[57]:
+
+
+train_data_correlation.tail()
+
+
+# In[58]:
+
+
+train_labels.tail()
+
+
+# In[69]:
+
+
+# from sklearn.manifold import TSNE
+# X_embedded = TSNE(n_components=2).fit_transform(np.array(train_data_correlation))
+print int(train_labels.iloc[0] == 1)
+
+
+# In[61]:
+
+
+from sklearn.decomposition import PCA
+pca = PCA(n_components=2)
+scatter_X = pca.fit_transform(np.array(train_data_correlation))
+for i in range(0,len(scatter_X)):
+    if(int(train_labels.iloc[i] == 1) == 1):
+        color = 'red'
+        else:
+            color = 'blue'
+        plt.scatter(scatter_X[i][0],scatter_X[i][1],c=color)
 
 
 # In[ ]:
@@ -389,26 +512,20 @@ seab.heatmap(corr,linewidths=0.4,linecolor='white',annot=False,cmap ="YlGnBu",)
 
 
 
-# In[ ]:
-
-
-
-
-
-# In[108]:
+# In[51]:
 
 
 from sklearn import metrics
-probabiloties = clf.predict_proba(np.array(train_labels).astype(int))
+probabilities = clf.predict_proba(np.array(train_labels).astype(int))
 mett=metrics.classification_report(np.array(train_labels.isFraud).astype(int),y)
 print mett
-p,r,t = metrics.precision_recall_curve(probas_pred=probabiloties[:,0],y_true=np.array(train_labels.isFraud).astype(int))
+p,r,t = metrics.precision_recall_curve(probas_pred=probabilities[:,0],y_true=np.array(train_labels.isFraud).astype(int))
 
 
-# In[109]:
+# In[18]:
 
 
-plt.plot(r, p, marker='.')
+# plt.plot(r, p, marker='^')
 
 
 # In[122]:
